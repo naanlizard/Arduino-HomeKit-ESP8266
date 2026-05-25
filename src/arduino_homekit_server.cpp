@@ -2995,6 +2995,17 @@ client_context_t* homekit_server_accept_client(homekit_server_t *server) {
 			delete wifiClient;
 			return NULL;
 		}
+		// Defensive: hasClient() returned true, but the remote may have
+		// RST/FIN'd before available() ran. In that case wifiClient->_client
+		// is NULL and the unconditional keepAlive() below dereferences NULL+9
+		// (the keepalive_enabled field) -> LoadProhibited (exception 28) ->
+		// reboot. connected() is null-safe (checks _client internally).
+		if (!wifiClient->connected()) {
+			INFO("wifiClient closed during accept (RST/FIN race)");
+			wifiClient->stop();
+			delete wifiClient;
+			return NULL;
+		}
 	} else {
 		return NULL;
 	}
